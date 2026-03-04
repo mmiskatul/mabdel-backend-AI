@@ -6,9 +6,11 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "mabdel_backend_ai"
+    jwt_secret_key: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()
-
