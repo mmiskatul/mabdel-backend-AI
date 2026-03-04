@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from app.models.permission import PermissionEntity
 from app.models.user import UserEntity
 
 
@@ -24,3 +25,16 @@ class IUserRepository(ABC):
     async def update(self, user: UserEntity) -> UserEntity:
         raise NotImplementedError
 
+
+class IPermissionRepository(ABC):
+    @abstractmethod
+    async def get_by_user_id(self, user_id: str) -> PermissionEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def save(self, permission: PermissionEntity) -> PermissionEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def accept_all(self, user_id: str) -> PermissionEntity:
+        raise NotImplementedError

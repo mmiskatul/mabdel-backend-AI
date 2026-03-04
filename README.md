@@ -57,4 +57,6 @@ requirements.txt
 - `GET /api/v1/users/{user_id}`
 - `GET /api/v1/users/`
 - `PATCH /api/v1/users/{user_id}/deactivate`
-
+- `GET /api/v1/permissions/{user_id}`
+- `PATCH /api/v1/permissions/{user_id}`
+- `POST /api/v1/permissions/{user_id}/accept-all`
