@@ -15,19 +15,30 @@ app/
   api/
     v1/
       routers/
+        auth_router.py
+        permission_router.py
         user_router.py
       api.py
   core/
     config.py
     database.py
+    security.py
   models/
+    auth.py
+    permission.py
     user.py
   repositories/
+    auth_repository.py
     base.py
+    permission_repository.py
     user_repository.py
   schemas/
+    auth.py
+    permission.py
     user.py
   services/
+    auth_service.py
+    permission_service.py
     user_service.py
   dependencies.py
   main.py
@@ -53,6 +64,12 @@ requirements.txt
 
 ## Sample Endpoints
 
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/forgot-password/options`
+- `POST /api/v1/auth/forgot-password/send-code`
+- `POST /api/v1/auth/forgot-password/verify-otp`
+- `POST /api/v1/auth/forgot-password/reset-password`
 - `POST /api/v1/users/`
 - `GET /api/v1/users/{user_id}`
 - `GET /api/v1/users/`

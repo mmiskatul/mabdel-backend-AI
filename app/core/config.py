@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
+    otp_code_expire_minutes: int = 10
+    reset_token_expire_minutes: int = 15
+    expose_test_verification_code: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

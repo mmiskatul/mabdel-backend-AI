@@ -1,9 +1,11 @@
 from fastapi import Depends
 
 from app.core.database import MongoClientManager
-from app.repositories.base import IPermissionRepository, IUserRepository
+from app.repositories.auth_repository import MongoAuthRepository
+from app.repositories.base import IAuthRepository, IPermissionRepository, IUserRepository
 from app.repositories.permission_repository import MongoPermissionRepository
 from app.repositories.user_repository import MongoUserRepository
+from app.services.auth_service import AuthService
 from app.services.permission_service import PermissionService
 from app.services.user_service import UserService
 
@@ -28,3 +30,14 @@ def get_permission_service(
     repository: IPermissionRepository = Depends(get_permission_repository),
 ) -> PermissionService:
     return PermissionService(repository)
+
+
+def get_auth_repository() -> IAuthRepository:
+    db = MongoClientManager.get_database()
+    return MongoAuthRepository(db)
+
+
+def get_auth_service(
+    repository: IAuthRepository = Depends(get_auth_repository),
+) -> AuthService:
+    return AuthService(repository)

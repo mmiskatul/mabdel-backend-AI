@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from app.models.auth import AccountEntity
 from app.models.permission import PermissionEntity
 from app.models.user import UserEntity
 
@@ -37,4 +38,30 @@ class IPermissionRepository(ABC):
 
     @abstractmethod
     async def accept_all(self, user_id: str) -> PermissionEntity:
+        raise NotImplementedError
+
+
+class IAuthRepository(ABC):
+    @abstractmethod
+    async def create(self, account: AccountEntity) -> AccountEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_email(self, email: str) -> AccountEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_phone(self, phone: str) -> AccountEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_identifier(self, identifier: str) -> AccountEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_reset_token_hash(self, token_hash: str) -> AccountEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update(self, account: AccountEntity) -> AccountEntity:
         raise NotImplementedError
