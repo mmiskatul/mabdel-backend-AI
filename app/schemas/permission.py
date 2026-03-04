@@ -1,6 +1,10 @@
 from pydantic import BaseModel, ConfigDict
 
 
+class PermissionToggle(BaseModel):
+    enabled: bool
+
+
 class PermissionUpdate(BaseModel):
     microphone_enabled: bool | None = None
     notifications_enabled: bool | None = None
@@ -15,4 +19,3 @@ class PermissionRead(BaseModel):
     microphone_enabled: bool
     notifications_enabled: bool
     contacts_enabled: bool
-

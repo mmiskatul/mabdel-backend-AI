@@ -33,3 +33,17 @@ class PermissionService:
     async def accept_all(self, user_id: str) -> PermissionEntity:
         return await self.repository.accept_all(user_id)
 
+    async def set_microphone(self, user_id: str, enabled: bool) -> PermissionEntity:
+        permission = await self.get_permissions(user_id)
+        permission.microphone_enabled = enabled
+        return await self.repository.save(permission)
+
+    async def set_notifications(self, user_id: str, enabled: bool) -> PermissionEntity:
+        permission = await self.get_permissions(user_id)
+        permission.notifications_enabled = enabled
+        return await self.repository.save(permission)
+
+    async def set_contacts(self, user_id: str, enabled: bool) -> PermissionEntity:
+        permission = await self.get_permissions(user_id)
+        permission.contacts_enabled = enabled
+        return await self.repository.save(permission)

@@ -60,3 +60,6 @@ requirements.txt
 - `GET /api/v1/permissions/{user_id}`
 - `PATCH /api/v1/permissions/{user_id}`
 - `POST /api/v1/permissions/{user_id}/accept-all`
+- `PATCH /api/v1/permissions/{user_id}/microphone`
+- `PATCH /api/v1/permissions/{user_id}/notifications`
+- `PATCH /api/v1/permissions/{user_id}/contacts`
