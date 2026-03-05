@@ -1,9 +1,19 @@
 from typing import Literal
 import re
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 PHONE_PATTERN = re.compile(r"^\+?[0-9]{6,20}$")
+FULL_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z .'-]{1,119}$")
 EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
 
@@ -30,6 +40,43 @@ class SignUpRequest(BaseModel):
     phone: str = Field(min_length=6, max_length=20)
     password: str = Field(min_length=8, max_length=128)
     accept_terms: bool
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not FULL_NAME_PATTERN.fullmatch(normalized):
+            raise ValueError("Full name format is invalid.")
+        return normalized
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        normalized = value.strip().replace(" ", "").replace("-", "")
+        if not _is_valid_phone(normalized):
+            raise ValueError("Phone number format is invalid.")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        password = value.strip()
+        if " " in password:
+            raise ValueError("Password cannot contain spaces.")
+        if not any(ch.islower() for ch in password):
+            raise ValueError("Password must include at least one lowercase letter.")
+        if not any(ch.isupper() for ch in password):
+            raise ValueError("Password must include at least one uppercase letter.")
+        if not any(ch.isdigit() for ch in password):
+            raise ValueError("Password must include at least one number.")
+        if not any(not ch.isalnum() for ch in password):
+            raise ValueError("Password must include at least one special character.")
+        return password
 
     @model_validator(mode="after")
     def validate_terms(self) -> "SignUpRequest":
