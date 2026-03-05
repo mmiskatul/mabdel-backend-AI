@@ -4,21 +4,22 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import bcrypt
 import jwt
 from cryptography.fernet import Fernet
-from passlib.context import CryptContext
 
 from app.shared.config import get_settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    normalized = hashlib.sha256(password.encode("utf-8")).hexdigest().encode("utf-8")
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(normalized, salt).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+    normalized = hashlib.sha256(password.encode("utf-8")).hexdigest().encode("utf-8")
+    return bcrypt.checkpw(normalized, password_hash.encode("utf-8"))
 
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
@@ -87,4 +88,3 @@ def decrypt_text(cipher_text: str) -> str:
 
 def safe_compare(left: str, right: str) -> bool:
     return hmac.compare_digest(left, right)
-
