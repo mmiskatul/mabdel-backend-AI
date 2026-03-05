@@ -1,6 +1,27 @@
 from typing import Literal
+import re
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, ValidationError, model_validator
+
+PHONE_PATTERN = re.compile(r"^\+?[0-9]{6,20}$")
+EMAIL_ADAPTER = TypeAdapter(EmailStr)
+
+
+def _looks_like_email(value: str) -> bool:
+    return "@" in value
+
+
+def _is_valid_phone(value: str) -> bool:
+    normalized = value.strip().replace(" ", "").replace("-", "")
+    return bool(PHONE_PATTERN.fullmatch(normalized))
+
+
+def _is_valid_email(value: str) -> bool:
+    try:
+        EMAIL_ADAPTER.validate_python(value)
+        return True
+    except ValidationError:
+        return False
 
 
 class SignUpRequest(BaseModel):
@@ -41,6 +62,17 @@ class LoginResponse(BaseModel):
 class ForgotPasswordOptionsRequest(BaseModel):
     identifier: str = Field(min_length=3, max_length=120)
 
+    @model_validator(mode="after")
+    def validate_identifier(self) -> "ForgotPasswordOptionsRequest":
+        raw = self.identifier.strip()
+        if _looks_like_email(raw):
+            if not _is_valid_email(raw):
+                raise ValueError("Identifier must be a valid email or phone number.")
+            return self
+        if not _is_valid_phone(raw):
+            raise ValueError("Identifier must be a valid email or phone number.")
+        return self
+
 
 class ForgotPasswordOptionsResponse(BaseModel):
     channels: list[Literal["email", "sms"]]
@@ -52,6 +84,19 @@ class SendVerificationCodeRequest(BaseModel):
     identifier: str = Field(min_length=3, max_length=120)
     channel: Literal["email", "sms"]
 
+    @model_validator(mode="after")
+    def validate_channel_and_identifier(self) -> "SendVerificationCodeRequest":
+        raw = self.identifier.strip()
+        if self.channel == "email":
+            if not _looks_like_email(raw):
+                raise ValueError("For email channel, identifier must be an email.")
+            if not _is_valid_email(raw):
+                raise ValueError("For email channel, identifier must be a valid email.")
+            return self
+        if not _is_valid_phone(raw):
+            raise ValueError("For sms channel, identifier must be a valid phone number.")
+        return self
+
 
 class SendVerificationCodeResponse(BaseModel):
     message: str
@@ -61,7 +106,7 @@ class SendVerificationCodeResponse(BaseModel):
 
 class VerifyOtpRequest(BaseModel):
     identifier: str = Field(min_length=3, max_length=120)
-    code: str = Field(min_length=4, max_length=4)
+    code: str = Field(pattern=r"^\d{4}$")
 
 
 class VerifyOtpResponse(BaseModel):
@@ -76,4 +121,3 @@ class ResetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
-
