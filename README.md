@@ -57,6 +57,7 @@ requirements.txt
    ```bash
    cp .env.example .env
    ```
+   Configure SMTP values in `.env` if you want email OTP delivery.
 4. Start server:
    ```bash
    uvicorn app.main:app --reload

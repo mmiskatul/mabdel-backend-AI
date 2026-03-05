@@ -12,6 +12,14 @@ class Settings(BaseSettings):
     otp_code_expire_minutes: int = 10
     reset_token_expire_minutes: int = 15
     expose_test_verification_code: bool = True
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str = "Mabdel AI"
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

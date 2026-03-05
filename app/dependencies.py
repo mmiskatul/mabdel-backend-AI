@@ -6,6 +6,7 @@ from app.repositories.base import IAuthRepository, IPermissionRepository, IUserR
 from app.repositories.permission_repository import MongoPermissionRepository
 from app.repositories.user_repository import MongoUserRepository
 from app.services.auth_service import AuthService
+from app.services.email_service import IEmailService, SMTPEmailService
 from app.services.permission_service import PermissionService
 from app.services.user_service import UserService
 
@@ -37,7 +38,12 @@ def get_auth_repository() -> IAuthRepository:
     return MongoAuthRepository(db)
 
 
+def get_email_service() -> IEmailService:
+    return SMTPEmailService()
+
+
 def get_auth_service(
     repository: IAuthRepository = Depends(get_auth_repository),
+    email_service: IEmailService = Depends(get_email_service),
 ) -> AuthService:
-    return AuthService(repository)
+    return AuthService(repository, email_service)

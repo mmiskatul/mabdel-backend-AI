@@ -23,11 +23,13 @@ from app.schemas.auth import (
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
+from app.services.email_service import IEmailService
 
 
 class AuthService:
-    def __init__(self, repository: IAuthRepository):
+    def __init__(self, repository: IAuthRepository, email_service: IEmailService):
         self.repository = repository
+        self.email_service = email_service
 
     async def sign_up(self, payload: SignUpRequest) -> LoginResponse:
         email = payload.email.strip().lower()
@@ -112,6 +114,17 @@ class AuthService:
         account.updated_at = now
 
         await self.repository.update(account)
+
+        if payload.channel == "email":
+            try:
+                await self.email_service.send_otp(
+                    to_email=account.email,
+                    code=code,
+                    expiry_minutes=settings.otp_code_expire_minutes,
+                )
+            except Exception as exc:
+                raise ValueError("Failed to send verification email.") from exc
+
         return SendVerificationCodeResponse(
             message="Verification code sent.",
             expires_in_seconds=settings.otp_code_expire_minutes * 60,
@@ -199,4 +212,3 @@ class AuthService:
             "phone": account.phone,
             "is_active": account.is_active,
         }
-
