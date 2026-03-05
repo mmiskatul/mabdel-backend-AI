@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
 from app.core.security import (
@@ -51,7 +51,7 @@ class AuthService:
             or signup_validation.token_expires_at is None
         ):
             raise ValueError("Invalid signup validation token.")
-        if signup_validation.token_expires_at < utc_now():
+        if self._ensure_aware_utc(signup_validation.token_expires_at) < utc_now():
             raise ValueError("Signup validation token expired.")
 
         existing_email = await self.repository.get_by_email(email)
@@ -128,7 +128,7 @@ class AuthService:
             raise ValueError("No signup validation request found for this email.")
         if validation.code_hash is None or validation.code_expires_at is None:
             raise ValueError("No active signup verification code.")
-        if validation.code_expires_at < utc_now():
+        if self._ensure_aware_utc(validation.code_expires_at) < utc_now():
             raise ValueError("Signup verification code expired.")
         if hash_secret_value(payload.code) != validation.code_hash:
             raise ValueError("Invalid signup verification code.")
@@ -226,7 +226,7 @@ class AuthService:
         account = await self._get_account_by_identifier(payload.identifier)
         if account.reset_code_hash is None or account.reset_code_expires_at is None:
             raise ValueError("No active verification code.")
-        if account.reset_code_expires_at < utc_now():
+        if self._ensure_aware_utc(account.reset_code_expires_at) < utc_now():
             raise ValueError("Verification code expired.")
         if hash_secret_value(payload.code) != account.reset_code_hash:
             raise ValueError("Invalid verification code.")
@@ -251,7 +251,7 @@ class AuthService:
         account = await self.repository.get_by_reset_token_hash(token_hash)
         if account is None or account.reset_token_expires_at is None:
             raise ValueError("Invalid reset token.")
-        if account.reset_token_expires_at < utc_now():
+        if self._ensure_aware_utc(account.reset_token_expires_at) < utc_now():
             raise ValueError("Reset token expired.")
 
         now = utc_now()
@@ -278,6 +278,12 @@ class AuthService:
         if "@" in trimmed:
             return trimmed.lower()
         return self._normalize_phone(trimmed)
+
+    @staticmethod
+    def _ensure_aware_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     @staticmethod
     def _mask_email(email: str) -> str:
