@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 from app.models.auth import AccountEntity
 from app.models.permission import PermissionEntity
+from app.models.signup_validation import SignupValidationEntity
 from app.models.user import UserEntity
 
 
@@ -64,4 +65,20 @@ class IAuthRepository(ABC):
 
     @abstractmethod
     async def update(self, account: AccountEntity) -> AccountEntity:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upsert_signup_validation(self, validation: SignupValidationEntity) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_signup_validation(
+        self,
+        email: str,
+        token_hash: str,
+    ) -> SignupValidationEntity | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete_signup_validations(self, email: str) -> None:
         raise NotImplementedError

@@ -37,7 +37,13 @@ async def sign_up(
     try:
         return await service.sign_up(payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        detail = str(exc)
+        error_status = (
+            status.HTTP_409_CONFLICT
+            if "already registered" in detail
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=error_status, detail=detail) from exc
 
 
 @router.post("/login", response_model=LoginResponse)

@@ -11,6 +11,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.auth import AccountEntity
+from app.models.signup_validation import SignupValidationEntity
 from app.repositories.base import IAuthRepository
 from app.schemas.auth import (
     ForgotPasswordOptionsResponse,
@@ -36,6 +37,13 @@ class AuthService:
         email = payload.email.strip().lower()
         phone = self._normalize_phone(payload.phone)
 
+        signup_token_hash = hash_secret_value(payload.signup_validation_token)
+        signup_validation = await self.repository.get_signup_validation(email, signup_token_hash)
+        if signup_validation is None:
+            raise ValueError("Invalid signup validation token.")
+        if signup_validation.expires_at < utc_now():
+            raise ValueError("Signup validation token expired.")
+
         existing_email = await self.repository.get_by_email(email)
         if existing_email is not None:
             raise ValueError("Email is already registered.")
@@ -55,13 +63,30 @@ class AuthService:
         )
 
         created = await self.repository.create(account)
+        await self.repository.delete_signup_validations(email)
         token = create_access_token(created.id)
         return LoginResponse(access_token=token, user=self._to_user_read(created))
 
     async def validate_signup_email(self, email: str) -> ValidateEmailResponse:
         normalized_email = email.strip().lower()
         existing = await self.repository.get_by_email(normalized_email)
-        return ValidateEmailResponse(email=normalized_email, is_available=existing is None)
+        if existing is not None:
+            return ValidateEmailResponse(email=normalized_email, is_available=False)
+
+        signup_validation_token = generate_reset_token()
+        expires_at = utc_now() + timedelta(minutes=settings.signup_validation_token_expire_minutes)
+        validation = SignupValidationEntity(
+            email=normalized_email,
+            token_hash=hash_secret_value(signup_validation_token),
+            expires_at=expires_at,
+        )
+        await self.repository.upsert_signup_validation(validation)
+        return ValidateEmailResponse(
+            email=normalized_email,
+            is_available=True,
+            signup_validation_token=signup_validation_token,
+            expires_in_seconds=settings.signup_validation_token_expire_minutes * 60,
+        )
 
     async def login(self, payload: LoginRequest) -> LoginResponse:
         identifier = self._normalize_identifier(payload.identifier)

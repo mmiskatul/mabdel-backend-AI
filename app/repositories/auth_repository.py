@@ -2,12 +2,14 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.auth import AccountEntity
+from app.models.signup_validation import SignupValidationEntity
 from app.repositories.base import IAuthRepository
 
 
 class MongoAuthRepository(IAuthRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db["accounts"]
+        self.signup_validation_collection = db["signup_validations"]
 
     async def create(self, account: AccountEntity) -> AccountEntity:
         result = await self.collection.insert_one(account.to_document())
@@ -38,3 +40,22 @@ class MongoAuthRepository(IAuthRepository):
         updated = await self.collection.find_one({"_id": ObjectId(account.id)})
         return AccountEntity.from_document(updated)
 
+    async def upsert_signup_validation(self, validation: SignupValidationEntity) -> None:
+        await self.signup_validation_collection.update_one(
+            {"email": validation.email},
+            {"$set": validation.to_document()},
+            upsert=True,
+        )
+
+    async def get_signup_validation(
+        self,
+        email: str,
+        token_hash: str,
+    ) -> SignupValidationEntity | None:
+        document = await self.signup_validation_collection.find_one(
+            {"email": email, "token_hash": token_hash},
+        )
+        return SignupValidationEntity.from_document(document) if document else None
+
+    async def delete_signup_validations(self, email: str) -> None:
+        await self.signup_validation_collection.delete_many({"email": email})

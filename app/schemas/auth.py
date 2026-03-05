@@ -39,6 +39,7 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     phone: str = Field(min_length=6, max_length=20)
     password: str = Field(min_length=8, max_length=128)
+    signup_validation_token: str = Field(min_length=24, max_length=256)
     accept_terms: bool
 
     @field_validator("full_name")
@@ -102,6 +103,8 @@ class ValidateEmailRequest(BaseModel):
 class ValidateEmailResponse(BaseModel):
     email: EmailStr
     is_available: bool
+    signup_validation_token: str | None = None
+    expires_in_seconds: int | None = None
 
 
 class AuthUserRead(BaseModel):

@@ -26,6 +26,7 @@ app/
   models/
     auth.py
     permission.py
+    signup_validation.py
     user.py
   repositories/
     auth_repository.py
@@ -82,3 +83,21 @@ requirements.txt
 - `PATCH /api/v1/permissions/{user_id}/microphone`
 - `PATCH /api/v1/permissions/{user_id}/notifications`
 - `PATCH /api/v1/permissions/{user_id}/contacts`
+
+## Signup Flow
+
+1. Call `POST /api/v1/auth/validate-email` with:
+   ```json
+   { "email": "user@example.com" }
+   ```
+2. If `is_available` is `true`, use returned `signup_validation_token` in `POST /api/v1/auth/signup`:
+   ```json
+   {
+     "full_name": "Mabdel User",
+     "email": "user@example.com",
+     "phone": "+8801XXXXXXXXX",
+     "password": "StrongPass123!",
+     "signup_validation_token": "token_from_validate_email",
+     "accept_terms": true
+   }
+   ```

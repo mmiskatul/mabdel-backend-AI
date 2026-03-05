@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
+    signup_validation_token_expire_minutes: int = 10
     otp_code_expire_minutes: int = 10
     reset_token_expire_minutes: int = 15
     expose_test_verification_code: bool = True
