@@ -5,15 +5,19 @@ from datetime import datetime
 @dataclass
 class SignupValidationEntity:
     email: str
-    token_hash: str
-    expires_at: datetime
+    code_hash: str | None = None
+    code_expires_at: datetime | None = None
+    token_hash: str | None = None
+    token_expires_at: datetime | None = None
     id: str | None = None
 
     def to_document(self) -> dict:
         return {
             "email": self.email,
+            "code_hash": self.code_hash,
+            "code_expires_at": self.code_expires_at,
             "token_hash": self.token_hash,
-            "expires_at": self.expires_at,
+            "token_expires_at": self.token_expires_at,
         }
 
     @classmethod
@@ -21,7 +25,8 @@ class SignupValidationEntity:
         return cls(
             id=str(document["_id"]),
             email=document["email"],
-            token_hash=document["token_hash"],
-            expires_at=document["expires_at"],
+            code_hash=document.get("code_hash"),
+            code_expires_at=document.get("code_expires_at"),
+            token_hash=document.get("token_hash"),
+            token_expires_at=document.get("token_expires_at"),
         )
-

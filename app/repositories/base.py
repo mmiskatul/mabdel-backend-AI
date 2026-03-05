@@ -72,11 +72,7 @@ class IAuthRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_signup_validation(
-        self,
-        email: str,
-        token_hash: str,
-    ) -> SignupValidationEntity | None:
+    async def get_signup_validation_by_email(self, email: str) -> SignupValidationEntity | None:
         raise NotImplementedError
 
     @abstractmethod

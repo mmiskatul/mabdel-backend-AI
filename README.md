@@ -66,8 +66,9 @@ requirements.txt
 
 ## Sample Endpoints
 
+- `POST /api/v1/auth/validate-email/send-code`
+- `POST /api/v1/auth/validate-email/verify-code`
 - `POST /api/v1/auth/signup`
-- `POST /api/v1/auth/validate-email`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/forgot-password/options`
 - `POST /api/v1/auth/forgot-password/send-code`
@@ -86,11 +87,18 @@ requirements.txt
 
 ## Signup Flow
 
-1. Call `POST /api/v1/auth/validate-email` with:
+1. Call `POST /api/v1/auth/validate-email/send-code` with:
    ```json
    { "email": "user@example.com" }
    ```
-2. If `is_available` is `true`, use returned `signup_validation_token` in `POST /api/v1/auth/signup`:
+2. Verify the email code using `POST /api/v1/auth/validate-email/verify-code`:
+   ```json
+   {
+     "email": "user@example.com",
+     "code": "1234"
+   }
+   ```
+3. Use returned `signup_validation_token` in `POST /api/v1/auth/signup`:
    ```json
    {
      "full_name": "Mabdel User",

@@ -20,8 +20,11 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     SendVerificationCodeRequest,
     SendVerificationCodeResponse,
+    SignupEmailValidationRequest,
+    SignupSendCodeResponse,
     SignUpRequest,
-    ValidateEmailResponse,
+    SignupVerifyCodeRequest,
+    SignupVerifyCodeResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
@@ -37,11 +40,18 @@ class AuthService:
         email = payload.email.strip().lower()
         phone = self._normalize_phone(payload.phone)
 
-        signup_token_hash = hash_secret_value(payload.signup_validation_token)
-        signup_validation = await self.repository.get_signup_validation(email, signup_token_hash)
+        signup_validation = await self.repository.get_signup_validation_by_email(email)
         if signup_validation is None:
+            raise ValueError("Signup email is not validated.")
+
+        signup_token_hash = hash_secret_value(payload.signup_validation_token)
+        if (
+            signup_validation.token_hash is None
+            or signup_validation.token_hash != signup_token_hash
+            or signup_validation.token_expires_at is None
+        ):
             raise ValueError("Invalid signup validation token.")
-        if signup_validation.expires_at < utc_now():
+        if signup_validation.token_expires_at < utc_now():
             raise ValueError("Signup validation token expired.")
 
         existing_email = await self.repository.get_by_email(email)
@@ -67,23 +77,73 @@ class AuthService:
         token = create_access_token(created.id)
         return LoginResponse(access_token=token, user=self._to_user_read(created))
 
-    async def validate_signup_email(self, email: str) -> ValidateEmailResponse:
-        normalized_email = email.strip().lower()
+    async def send_signup_email_code(
+        self,
+        payload: SignupEmailValidationRequest,
+    ) -> SignupSendCodeResponse:
+        normalized_email = str(payload.email).strip().lower()
         existing = await self.repository.get_by_email(normalized_email)
         if existing is not None:
-            return ValidateEmailResponse(email=normalized_email, is_available=False)
+            return SignupSendCodeResponse(
+                email=normalized_email,
+                is_available=False,
+                message="Email is already registered.",
+            )
 
-        signup_validation_token = generate_reset_token()
-        expires_at = utc_now() + timedelta(minutes=settings.signup_validation_token_expire_minutes)
+        code = generate_otp_code()
+        code_expires_at = utc_now() + timedelta(minutes=settings.otp_code_expire_minutes)
         validation = SignupValidationEntity(
             email=normalized_email,
-            token_hash=hash_secret_value(signup_validation_token),
-            expires_at=expires_at,
+            code_hash=hash_secret_value(code),
+            code_expires_at=code_expires_at,
+            token_hash=None,
+            token_expires_at=None,
         )
         await self.repository.upsert_signup_validation(validation)
-        return ValidateEmailResponse(
+
+        try:
+            await self.email_service.send_otp(
+                to_email=normalized_email,
+                code=code,
+                expiry_minutes=settings.otp_code_expire_minutes,
+            )
+        except Exception as exc:
+            raise ValueError("Failed to send signup verification email.") from exc
+
+        return SignupSendCodeResponse(
             email=normalized_email,
             is_available=True,
+            message="Signup verification code sent.",
+            expires_in_seconds=settings.otp_code_expire_minutes * 60,
+            dev_verification_code=code if settings.expose_test_verification_code else None,
+        )
+
+    async def verify_signup_email_code(
+        self,
+        payload: SignupVerifyCodeRequest,
+    ) -> SignupVerifyCodeResponse:
+        normalized_email = str(payload.email).strip().lower()
+        validation = await self.repository.get_signup_validation_by_email(normalized_email)
+        if validation is None:
+            raise ValueError("No signup validation request found for this email.")
+        if validation.code_hash is None or validation.code_expires_at is None:
+            raise ValueError("No active signup verification code.")
+        if validation.code_expires_at < utc_now():
+            raise ValueError("Signup verification code expired.")
+        if hash_secret_value(payload.code) != validation.code_hash:
+            raise ValueError("Invalid signup verification code.")
+
+        signup_validation_token = generate_reset_token()
+        validation.token_hash = hash_secret_value(signup_validation_token)
+        validation.token_expires_at = utc_now() + timedelta(
+            minutes=settings.signup_validation_token_expire_minutes,
+        )
+        validation.code_hash = None
+        validation.code_expires_at = None
+        await self.repository.upsert_signup_validation(validation)
+
+        return SignupVerifyCodeResponse(
+            email=normalized_email,
             signup_validation_token=signup_validation_token,
             expires_in_seconds=settings.signup_validation_token_expire_minutes * 60,
         )

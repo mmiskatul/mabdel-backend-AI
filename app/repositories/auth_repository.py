@@ -47,14 +47,8 @@ class MongoAuthRepository(IAuthRepository):
             upsert=True,
         )
 
-    async def get_signup_validation(
-        self,
-        email: str,
-        token_hash: str,
-    ) -> SignupValidationEntity | None:
-        document = await self.signup_validation_collection.find_one(
-            {"email": email, "token_hash": token_hash},
-        )
+    async def get_signup_validation_by_email(self, email: str) -> SignupValidationEntity | None:
+        document = await self.signup_validation_collection.find_one({"email": email})
         return SignupValidationEntity.from_document(document) if document else None
 
     async def delete_signup_validations(self, email: str) -> None:

@@ -10,9 +10,11 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     SendVerificationCodeRequest,
     SendVerificationCodeResponse,
+    SignupEmailValidationRequest,
+    SignupSendCodeResponse,
     SignUpRequest,
-    ValidateEmailRequest,
-    ValidateEmailResponse,
+    SignupVerifyCodeRequest,
+    SignupVerifyCodeResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
@@ -21,12 +23,26 @@ from app.services.auth_service import AuthService
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-@router.post("/validate-email", response_model=ValidateEmailResponse)
-async def validate_signup_email(
-    payload: ValidateEmailRequest,
+@router.post("/validate-email/send-code", response_model=SignupSendCodeResponse)
+async def send_signup_email_validation_code(
+    payload: SignupEmailValidationRequest,
     service: AuthService = Depends(get_auth_service),
-) -> ValidateEmailResponse:
-    return await service.validate_signup_email(str(payload.email))
+) -> SignupSendCodeResponse:
+    try:
+        return await service.send_signup_email_code(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/validate-email/verify-code", response_model=SignupVerifyCodeResponse)
+async def verify_signup_email_validation_code(
+    payload: SignupVerifyCodeRequest,
+    service: AuthService = Depends(get_auth_service),
+) -> SignupVerifyCodeResponse:
+    try:
+        return await service.verify_signup_email_code(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)

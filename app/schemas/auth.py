@@ -91,7 +91,7 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
-class ValidateEmailRequest(BaseModel):
+class SignupEmailValidationRequest(BaseModel):
     email: EmailStr
 
     @field_validator("email", mode="before")
@@ -100,11 +100,28 @@ class ValidateEmailRequest(BaseModel):
         return value.strip().lower()
 
 
-class ValidateEmailResponse(BaseModel):
+class SignupSendCodeResponse(BaseModel):
     email: EmailStr
     is_available: bool
-    signup_validation_token: str | None = None
+    message: str
     expires_in_seconds: int | None = None
+    dev_verification_code: str | None = None
+
+
+class SignupVerifyCodeRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{4}$")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class SignupVerifyCodeResponse(BaseModel):
+    email: EmailStr
+    signup_validation_token: str
+    expires_in_seconds: int
 
 
 class AuthUserRead(BaseModel):
