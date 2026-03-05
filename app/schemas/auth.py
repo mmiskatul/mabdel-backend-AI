@@ -90,6 +90,20 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ValidateEmailRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class ValidateEmailResponse(BaseModel):
+    email: EmailStr
+    is_available: bool
+
+
 class AuthUserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

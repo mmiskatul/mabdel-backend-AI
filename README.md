@@ -66,6 +66,7 @@ requirements.txt
 ## Sample Endpoints
 
 - `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/validate-email`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/forgot-password/options`
 - `POST /api/v1/auth/forgot-password/send-code`

@@ -11,12 +11,22 @@ from app.schemas.auth import (
     SendVerificationCodeRequest,
     SendVerificationCodeResponse,
     SignUpRequest,
+    ValidateEmailRequest,
+    ValidateEmailResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+@router.post("/validate-email", response_model=ValidateEmailResponse)
+async def validate_signup_email(
+    payload: ValidateEmailRequest,
+    service: AuthService = Depends(get_auth_service),
+) -> ValidateEmailResponse:
+    return await service.validate_signup_email(str(payload.email))
 
 
 @router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
@@ -84,4 +94,3 @@ async def reset_forgot_password(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MessageResponse(message="Password updated successfully.")
-

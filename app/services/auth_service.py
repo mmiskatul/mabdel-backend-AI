@@ -20,6 +20,7 @@ from app.schemas.auth import (
     SendVerificationCodeRequest,
     SendVerificationCodeResponse,
     SignUpRequest,
+    ValidateEmailResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
@@ -56,6 +57,11 @@ class AuthService:
         created = await self.repository.create(account)
         token = create_access_token(created.id)
         return LoginResponse(access_token=token, user=self._to_user_read(created))
+
+    async def validate_signup_email(self, email: str) -> ValidateEmailResponse:
+        normalized_email = email.strip().lower()
+        existing = await self.repository.get_by_email(normalized_email)
+        return ValidateEmailResponse(email=normalized_email, is_available=existing is None)
 
     async def login(self, payload: LoginRequest) -> LoginResponse:
         identifier = self._normalize_identifier(payload.identifier)
