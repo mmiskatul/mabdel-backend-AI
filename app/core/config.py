@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "Mabdel AI Backend"
+    app_name: str = "Mabdel backend AI"
     app_version: str = "0.1.0"
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "mabdel_backend_ai"
