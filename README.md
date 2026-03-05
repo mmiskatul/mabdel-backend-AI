@@ -1,111 +1,85 @@
-# FastAPI + Pydantic + MongoDB (OOP + Design Patterns)
+# Mabdel backend AI
 
-This starter uses:
-- FastAPI for HTTP APIs
-- Pydantic v2 for schema validation
-- MongoDB with Motor (async driver)
-- Repository pattern + Service layer
-- Dependency Injection via FastAPI `Depends`
-- Singleton-style Mongo client manager
+Production-oriented FastAPI backend for Mabdel AI mobile app modules:
+- Home dashboard widgets
+- Unified Inbox (conversations/messages)
+- Calls
+- Voice command flow + command history
+- Group placeholder
+- Documents (invoices + pdf export + docusign stub)
+- Integrations catalog/connect/disconnect
+- Settings + automation rules
+- AI Agent endpoints (summary/draft/decision/smartflow)
+- Webhooks ingestion + queue worker + websocket events
 
-## Project Structure
+## Tech stack
+- Python 3.11+
+- FastAPI (async)
+- MongoDB + Motor
+- Pydantic v2 + pydantic-settings
+- JWT (access + refresh), bcrypt hashing
+- Redis + arq workers
+- WebSockets
+- Docker + docker-compose
 
-```text
-app/
-  api/
-    v1/
-      routers/
-        auth_router.py
-        permission_router.py
-        user_router.py
-      api.py
-  core/
-    config.py
-    database.py
-    security.py
-  models/
-    auth.py
-    permission.py
-    signup_validation.py
-    user.py
-  repositories/
-    auth_repository.py
-    base.py
-    permission_repository.py
-    user_repository.py
-  schemas/
-    auth.py
-    permission.py
-    user.py
-  services/
-    auth_service.py
-    permission_service.py
-    user_service.py
-  dependencies.py
-  main.py
-requirements.txt
-.env.example
+## Run locally
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn app.main:app --reload
 ```
 
-## Run
+Worker:
+```bash
+arq app.infrastructure.queue.worker.WorkerSettings
+```
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Copy env file:
-   ```bash
-   cp .env.example .env
-   ```
-   Configure SMTP values in `.env` if you want email OTP delivery.
-4. Start server:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+## Run with Docker
+```bash
+docker compose up --build
+```
 
-## Sample Endpoints
+## Key API examples
 
-- `POST /api/v1/auth/validate-email/send-code`
-- `POST /api/v1/auth/validate-email/verify-code`
-- `POST /api/v1/auth/signup`
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/forgot-password/options`
-- `POST /api/v1/auth/forgot-password/send-code`
-- `POST /api/v1/auth/forgot-password/verify-otp`
-- `POST /api/v1/auth/forgot-password/reset-password`
-- `POST /api/v1/users/`
-- `GET /api/v1/users/{user_id}`
-- `GET /api/v1/users/`
-- `PATCH /api/v1/users/{user_id}/deactivate`
-- `GET /api/v1/permissions/{user_id}`
-- `PATCH /api/v1/permissions/{user_id}`
-- `POST /api/v1/permissions/{user_id}/accept-all`
-- `PATCH /api/v1/permissions/{user_id}/microphone`
-- `PATCH /api/v1/permissions/{user_id}/notifications`
-- `PATCH /api/v1/permissions/{user_id}/contacts`
+### Auth flow
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/signup/send-code -H "Content-Type: application/json" -d "{\"email\":\"user@example.com\"}"
+curl -X POST http://localhost:8000/api/v1/auth/signup/verify-code -H "Content-Type: application/json" -d "{\"email\":\"user@example.com\",\"code\":\"1234\"}"
+curl -X POST http://localhost:8000/api/v1/auth/signup -H "Content-Type: application/json" -d "{\"email\":\"user@example.com\",\"name\":\"User\",\"password\":\"StrongPass123!\",\"language\":\"en\",\"timezone\":\"UTC\",\"signup_validation_token\":\"TOKEN\"}"
+curl -X POST http://localhost:8000/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"user@example.com\",\"password\":\"StrongPass123!\"}"
+```
 
-## Signup Flow
+### Integrations
+```bash
+curl -H "Authorization: Bearer ACCESS" http://localhost:8000/api/v1/integrations/catalog
+curl -X POST -H "Authorization: Bearer ACCESS" http://localhost:8000/api/v1/integrations/whatsapp/connect
+```
 
-1. Call `POST /api/v1/auth/validate-email/send-code` with:
-   ```json
-   { "email": "user@example.com" }
-   ```
-2. Verify the email code using `POST /api/v1/auth/validate-email/verify-code`:
-   ```json
-   {
-     "email": "user@example.com",
-     "code": "1234"
-   }
-   ```
-3. Use returned `signup_validation_token` in `POST /api/v1/auth/signup`:
-   ```json
-   {
-     "full_name": "Mabdel User",
-     "email": "user@example.com",
-     "phone": "+8801XXXXXXXXX",
-     "password": "StrongPass123!",
-     "signup_validation_token": "token_from_validate_email",
-     "accept_terms": true
-   }
-   ```
+### Webhooks
+```bash
+curl -X POST http://localhost:8000/api/v1/webhooks/whatsapp -H "Content-Type: application/json" -d "{\"user_id\":\"USER_ID\",\"messages\":[{\"account_id\":\"acc1\",\"thread_id\":\"th1\",\"from_id\":\"ct1\",\"from_name\":\"Client\",\"text\":\"hi\",\"message_id\":\"m1\"}]}"
+```
+
+### Conversations
+```bash
+curl -H "Authorization: Bearer ACCESS" "http://localhost:8000/api/v1/conversations?filter=all"
+curl -X POST -H "Authorization: Bearer ACCESS" -H "Content-Type: application/json" http://localhost:8000/api/v1/conversations/CONV_ID/messages -d "{\"text\":\"Hello from Mabdel\"}"
+```
+
+### Commands
+```bash
+curl -X POST -H "Authorization: Bearer ACCESS" -H "Content-Type: application/json" http://localhost:8000/api/v1/commands/interpret -d "{\"text\":\"Cancel Invoice\",\"context\":{\"document_id\":\"DOC_ID\"}}"
+curl -X POST -H "Authorization: Bearer ACCESS" -H "Content-Type: application/json" http://localhost:8000/api/v1/commands/execute -d "{\"execute_token\":\"TOKEN\"}"
+```
+
+## Worker jobs
+- `process_inbound`: raw event -> adapter parse -> contact/conversation/message upserts -> activity -> websocket
+- `send_message`: outbound queued message -> adapter send -> status/activity/audit -> websocket
+- `agent_decide`: inbound message -> guarded auto-reply decision
+
+## Notes
+- External platform APIs are adapter stubs but contracts are production-ready.
+- OAuth tokens are encrypted at rest with Fernet key from env.
+- Multi-tenancy enforced by `user_id` filters in service layer.

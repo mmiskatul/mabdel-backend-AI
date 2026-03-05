@@ -1,2 +1,1 @@
-"""Application package."""
-
+"""Mabdel backend AI package."""
