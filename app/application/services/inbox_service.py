@@ -96,16 +96,18 @@ class InboxService:
         )
         return {"id": message_id, "status": MessageStatus.queued.value}
 
-    async def process_outbound_message(self, message_id: str, ws_manager) -> None:
+    async def process_outbound_message(self, message_id: str, ws_manager) -> dict:
         message = await self.repo.find_one("messages", {"_id": self.repo.object_id(message_id)})
         if not message:
             raise NotFoundError("Message not found.")
         conversation = await self.repo.find_one(
             "conversations", {"_id": self.repo.object_id(message["conversation_id"])}
         )
-        integration = await self.repo.find_one(
-            "integration_accounts", {"_id": self.repo.object_id(conversation["integration_account_id"])}
-        )
+        integration = None
+        if conversation.get("integration_account_id"):
+            integration = await self.repo.find_one(
+                "integration_accounts", {"_id": self.repo.object_id(conversation["integration_account_id"])}
+            )
         token = None
         if integration:
             oauth = await self.repo.find_one(
@@ -121,6 +123,7 @@ class InboxService:
         )
 
         status = MessageStatus.sent.value if result.success else MessageStatus.failed.value
+        now = datetime.now(UTC)
         await self.repo.update_one(
             "messages",
             {"_id": self.repo.object_id(message["id"])},
@@ -128,8 +131,14 @@ class InboxService:
                 "$set": {
                     "status": status,
                     "platform_message_id": result.platform_message_id,
+                    "updated_at": now,
                 }
             },
+        )
+        await self.repo.update_one(
+            "conversations",
+            {"_id": self.repo.object_id(conversation["id"])},
+            {"$set": {"last_message_at": now, "updated_at": now}},
         )
         await self.repo.insert_one(
             "activity_events",
@@ -139,7 +148,7 @@ class InboxService:
                 "ref": {"type": "message", "id": message["id"]},
                 "title": "Message sent",
                 "subtitle": message["text"][:80],
-                "created_at": datetime.now(UTC),
+                "created_at": now,
             },
         )
         await self.repo.insert_one(
@@ -150,7 +159,7 @@ class InboxService:
                 "entity_type": "message",
                 "entity_id": message["id"],
                 "details": {"status": status},
-                "created_at": datetime.now(UTC),
+                "created_at": now,
             },
         )
         await ws_manager.emit(
@@ -158,6 +167,17 @@ class InboxService:
             "message.status",
             {"message_id": message["id"], "status": status},
         )
+        await ws_manager.emit(
+            message["user_id"],
+            "conversation.updated",
+            {"conversation_id": conversation["id"], "last_message_at": now.isoformat()},
+        )
+        return {
+            "message_id": message["id"],
+            "conversation_id": conversation["id"],
+            "user_id": message["user_id"],
+            "status": status,
+        }
 
     async def process_normalized_inbound(
         self,

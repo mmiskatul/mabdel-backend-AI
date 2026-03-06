@@ -121,6 +121,44 @@ class AgentService:
         )
         return SmartFlowResponse.model_validate(state["final_output"])
 
+    async def post_send_followup(self, user_id: str, conversation_id: str, message_id: str) -> dict:
+        summary = await self.conversation_summary(user_id, conversation_id)
+        draft = await self.draft_reply(user_id, conversation_id)
+        existing = await self.repo.find_one(
+            "internal_messages",
+            {
+                "user_id": user_id,
+                "source_message_id": message_id,
+                "kind": "ai_followup",
+            },
+        )
+        if not existing:
+            now = datetime.now(UTC)
+            internal_id = await self.repo.insert_one(
+                "internal_messages",
+                {
+                    "user_id": user_id,
+                    "kind": "ai_followup",
+                    "source_message_id": message_id,
+                    "conversation_id": conversation_id,
+                    "summary": summary.model_dump(),
+                    "suggested_reply": draft.model_dump(),
+                    "created_at": now,
+                },
+            )
+            await self.repo.insert_one(
+                "activity_events",
+                {
+                    "user_id": user_id,
+                    "event_type": "ai_followup_created",
+                    "ref": {"type": "internal_message", "id": internal_id},
+                    "title": "AI follow-up prepared",
+                    "subtitle": summary.summary[:80],
+                    "created_at": now,
+                },
+            )
+        return {"summary": summary.model_dump(), "suggested_reply": draft.model_dump()}
+
     async def _store_draft_reply(self, message: dict, decision: AutoReplyDecision) -> None:
         existing = await self.repo.find_one(
             "internal_messages",

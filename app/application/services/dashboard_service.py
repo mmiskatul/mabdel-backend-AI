@@ -27,16 +27,14 @@ class DashboardService:
         calls_count = await self.repo.count("calls", {"user_id": user_id})
         calls_preview = await self.repo.find_many("calls", {"user_id": user_id}, limit=3, sort=[("created_at", -1)])
         activity = await self.repo.find_many("activity_events", {"user_id": user_id}, limit=5, sort=[("created_at", -1)])
+        upcoming_events = await self.repo.find_many("calendar_events", {"user_id": user_id}, limit=1, sort=[("starts_at", 1)])
         return {
             "greeting_name": (user or {}).get("name", "User"),
             "unread_total_count": unread_total,
             "unified_conversations_preview": conversations,
             "contacts_count": contacts_count,
             "contacts_preview": contacts_preview,
-            "upcoming_calendar_event": {
-                "title": "No connected calendar",
-                "starts_at": None,
-            },
+            "upcoming_calendar_event": upcoming_events[0] if upcoming_events else {"title": "No connected calendar", "starts_at": None},
             "integrations_connected": integrations,
             "documents_shortcuts": docs,
             "call_analytics": {
@@ -46,4 +44,3 @@ class DashboardService:
             },
             "recent_activity_preview": activity,
         }
-

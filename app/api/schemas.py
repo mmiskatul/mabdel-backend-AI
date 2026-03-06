@@ -87,3 +87,17 @@ class ExecuteCommandBody(BaseModel):
 class SmartFlowBody(BaseModel):
     text: str
 
+
+class CalendarAvailabilityQuery(BaseModel):
+    date_from: datetime
+    date_to: datetime
+    duration_minutes: int = Field(default=30, ge=15, le=180)
+
+
+class CreateMeetingBody(BaseModel):
+    conversation_id: str
+    title: str = Field(min_length=3, max_length=120)
+    start_at: datetime
+    duration_minutes: int = Field(default=30, ge=15, le=180)
+    agenda: str | None = None
+    send_message_to_client: bool = True

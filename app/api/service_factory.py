@@ -46,8 +46,12 @@ def get_dashboard_service(repo: MongoRepository = Depends(get_repo)) -> Dashboar
     return DashboardService(repo)
 
 
-def get_calendar_service() -> CalendarService:
-    return CalendarService(CalendarStub())
+def get_calendar_service(
+    repo: MongoRepository = Depends(get_repo),
+    queue=Depends(get_queue),
+) -> CalendarService:
+    inbox = InboxService(repo, AdapterFactory())
+    return CalendarService(repo, CalendarStub(), inbox, queue, ws_manager)
 
 
 def get_documents_service(repo: MongoRepository = Depends(get_repo)) -> DocumentsService:
@@ -82,4 +86,3 @@ def get_command_service(
             "agent": agent,
         },
     )
-

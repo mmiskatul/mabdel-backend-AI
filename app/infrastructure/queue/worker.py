@@ -20,7 +20,16 @@ async def send_message(ctx, payload: dict) -> None:
     repo = MongoRepository()
     adapters = AdapterFactory()
     inbox_service = InboxService(repo, adapters)
-    await inbox_service.process_outbound_message(payload["message_id"], ctx["ws"])
+    result = await inbox_service.process_outbound_message(payload["message_id"], ctx["ws"])
+    if result.get("status") == "sent":
+        await ctx["queue"].enqueue(
+            "post_send_ai_followup",
+            {
+                "user_id": result["user_id"],
+                "conversation_id": result["conversation_id"],
+                "message_id": result["message_id"],
+            },
+        )
 
 
 async def agent_decide(ctx, payload: dict) -> None:
@@ -29,10 +38,30 @@ async def agent_decide(ctx, payload: dict) -> None:
     await agent_service.decide_inbound(payload["message_id"])
 
 
+async def post_send_ai_followup(ctx, payload: dict) -> None:
+    repo = MongoRepository()
+    agent_service = AgentService(repo)
+    followup = await agent_service.post_send_followup(
+        user_id=payload["user_id"],
+        conversation_id=payload["conversation_id"],
+        message_id=payload["message_id"],
+    )
+    await ctx["ws"].emit(
+        payload["user_id"],
+        "activity.new",
+        {
+            "event_type": "ai_followup_created",
+            "conversation_id": payload["conversation_id"],
+            "message_id": payload["message_id"],
+            "summary": followup["summary"],
+        },
+    )
+
+
 class WorkerSettings:
     settings = get_settings()
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    functions = [process_inbound, send_message, agent_decide]
+    functions = [process_inbound, send_message, agent_decide, post_send_ai_followup]
 
     @staticmethod
     async def startup(ctx):
@@ -41,4 +70,3 @@ class WorkerSettings:
 
         ctx["queue"] = ArqJobQueue()
         ctx["ws"] = ws_manager
-
