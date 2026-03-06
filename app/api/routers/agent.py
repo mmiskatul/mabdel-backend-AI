@@ -29,9 +29,10 @@ async def draft_reply(
 @router.post("/inbound/{message_id}/decide")
 async def decide_inbound(
     message_id: str,
+    user_id: str = Depends(get_current_user_id),
     service: AgentService = Depends(get_agent_service),
 ):
-    return await service.decide_inbound(message_id)
+    return await service.decide_inbound(message_id, user_id=user_id)
 
 
 @router.post("/smartflow/ask")
@@ -41,4 +42,3 @@ async def smartflow_ask(
     service: AgentService = Depends(get_agent_service),
 ):
     return await service.smartflow_ask(user_id, body.text)
-

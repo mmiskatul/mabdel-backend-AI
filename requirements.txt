@@ -11,5 +11,7 @@ cryptography==46.0.3
 arq==0.26.3
 redis==5.2.1
 httpx==0.28.1
+langchain-core==0.3.79
+langgraph==0.6.11
 pytest==8.4.2
 pytest-asyncio==1.2.0
