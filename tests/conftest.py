@@ -32,7 +32,7 @@ class FakeRepo:
         matched = [self._clean(d) for d in self.data[collection] if self._matches(d, query)]
         if sort:
             key, order = sort[0]
-            matched.sort(key=lambda x: x.get(key), reverse=order < 0)
+            matched.sort(key=lambda item: item.get(key), reverse=order < 0)
         return matched[:limit]
 
     async def update_one(self, collection: str, query: dict, update: dict, upsert: bool = False):
@@ -40,10 +40,7 @@ class FakeRepo:
             if self._matches(doc, query):
                 if "$set" in update:
                     for key, value in update["$set"].items():
-                        self._set_path(doc, key, value)
-                if "$inc" in update:
-                    for key, value in update["$inc"].items():
-                        doc[key] = int(doc.get(key, 0)) + int(value)
+                        doc[key] = value
                 self.data[collection][i] = doc
                 return
         if upsert:
@@ -55,22 +52,8 @@ class FakeRepo:
     async def count(self, collection: str, query: dict):
         return len([d for d in self.data[collection] if self._matches(d, query)])
 
-    async def aggregate(self, collection: str, pipeline: list[dict]):
-        docs = [self._clean(d) for d in self.data[collection]]
-        if len(pipeline) >= 2 and "$group" in pipeline[1]:
-            group_field = pipeline[1]["$group"]["_id"].lstrip("$")
-            counts = defaultdict(int)
-            for doc in docs:
-                counts[doc.get(group_field)] += 1
-            return [{"_id": k, "count": v} for k, v in counts.items()]
-        return docs
-
     def _matches(self, doc: dict, query: dict):
         for key, value in query.items():
-            if key == "$or":
-                if not any(self._matches(doc, q) for q in value):
-                    return False
-                continue
             if isinstance(value, dict) and "$gt" in value:
                 lhs = doc.get(key)
                 rhs = value["$gt"]
@@ -89,14 +72,6 @@ class FakeRepo:
             elif doc.get(key) != value:
                 return False
         return True
-
-    @staticmethod
-    def _set_path(doc: dict, dotted_key: str, value):
-        parts = dotted_key.split(".")
-        node = doc
-        for part in parts[:-1]:
-            node = node.setdefault(part, {})
-        node[parts[-1]] = value
 
     @staticmethod
     def _clean(doc: dict):
@@ -131,23 +106,6 @@ class FakeEmailService:
         self.sent.append((to_email, code, expiry_minutes))
 
 
-class FakeWs:
-    def __init__(self):
-        self.events = []
-
-    async def emit(self, user_id: str, event: str, payload: dict):
-        self.events.append((user_id, event, payload))
-
-
-class FakeQueue:
-    def __init__(self):
-        self.jobs = []
-
-    async def enqueue(self, name: str, payload: dict):
-        self.jobs.append((name, payload))
-        return f"job_{len(self.jobs)}"
-
-
 @pytest.fixture
 def fake_repo():
     return FakeRepo()
@@ -161,14 +119,3 @@ def fake_sessions():
 @pytest.fixture
 def fake_email():
     return FakeEmailService()
-
-
-@pytest.fixture
-def fake_ws():
-    return FakeWs()
-
-
-@pytest.fixture
-def fake_queue():
-    return FakeQueue()
-

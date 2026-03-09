@@ -1,96 +1,95 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from app.agent.models import AutoReplyDecision, DraftReplyResponse, SmartFlowResponse, SummaryResponse
-from app.agent.prompts import UNIFIED_INBOX_SYSTEM_PROMPT, analyze_inbound_text, safe_review_reply
+import json
+from abc import ABC, abstractmethod
+from typing import Any
+
+import httpx
+
+from app.agent.prompts import VOICE_AGENT_SYSTEM_PROMPT
 from app.shared.config import get_settings
 
 
-class LLMClient(ABC):
+class VoiceLLMClient(ABC):
     @abstractmethod
-    async def summarize(self, text: str) -> SummaryResponse:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def draft_reply(self, text: str) -> DraftReplyResponse:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def auto_reply_decision(self, text: str) -> AutoReplyDecision:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def ask(self, text: str) -> SmartFlowResponse:
+    async def generate_reply(self, history: list[dict[str, str]], user_text: str) -> str:
         raise NotImplementedError
 
 
-class StubLLMClient(LLMClient):
-    async def summarize(self, text: str) -> SummaryResponse:
-        _ = UNIFIED_INBOX_SYSTEM_PROMPT
-        analysis = analyze_inbound_text(text)
-        preview = analysis["normalized_text"][:250] if analysis["normalized_text"] else "No conversation text available."
-        key_points = ["Inbound context analyzed", "Top intent identified"]
-        if analysis["prompt_injection_detected"]:
-            key_points.append("Prompt-injection style content detected")
-        if analysis["sensitive_topic"]:
-            key_points.append("Sensitive handling required")
-        return SummaryResponse(
-            summary=f"Summary: {preview}",
-            key_points=key_points,
-            action_items=["Review draft reply", "Confirm next action"],
-        )
-
-    async def draft_reply(self, text: str) -> DraftReplyResponse:
-        analysis = analyze_inbound_text(text)
-        secure_channel = bool(analysis["secret_request_detected"])
-        reply_text = safe_review_reply(text, secure_channel=secure_channel)
-        tags = ["draft", "review_required"]
-        if analysis["prompt_injection_detected"]:
-            tags.append("prompt_injection")
-        if analysis["sensitive_topic"]:
-            tags.append("sensitive")
-        return DraftReplyResponse(
-            reply_text=reply_text,
-            confidence=0.58 if analysis["prompt_injection_detected"] else 0.72,
-            requires_human_review=True,
-            safe_to_auto_send=False,
-            reason="secure_review_required" if secure_channel else "draft_only_policy",
-            tags=tags,
-        )
-
-    async def auto_reply_decision(self, text: str) -> AutoReplyDecision:
-        analysis = analyze_inbound_text(text)
-        if analysis["prompt_injection_detected"] or analysis["sensitive_topic"]:
-            return AutoReplyDecision(
-                should_reply=False,
-                reply_text="",
-                reason="sensitive_or_untrusted_inbound",
-                confidence=0.92 if analysis["prompt_injection_detected"] else 0.89,
-                safe_to_auto_send=False,
-                requires_human_review=True,
-                prompt_injection_detected=bool(analysis["prompt_injection_detected"]),
-                sensitive_topic=bool(analysis["sensitive_topic"]),
-            )
-        return AutoReplyDecision(
-            should_reply=True,
-            reply_text=safe_review_reply(text),
-            reason="routine_busy_mode_candidate",
-            confidence=0.72,
-            safe_to_auto_send=True,
-            requires_human_review=False,
-            prompt_injection_detected=False,
-            sensitive_topic=False,
-        )
-
-    async def ask(self, text: str) -> SmartFlowResponse:
-        analysis = analyze_inbound_text(text)
-        if analysis["sensitive_topic"] or analysis["prompt_injection_detected"]:
-            return SmartFlowResponse(
-                answer=safe_review_reply(text, secure_channel=bool(analysis["secret_request_detected"])),
-                suggested_actions=[],
-            )
-        return SmartFlowResponse(answer=f"SmartFlow response for: {analysis['normalized_text']}", suggested_actions=[])
+class StubVoiceLLMClient(VoiceLLMClient):
+    async def generate_reply(self, history: list[dict[str, str]], user_text: str) -> str:
+        lowered = user_text.strip().lower()
+        if "hello" in lowered or "hi" in lowered:
+            return "Hello. I am here and listening. What do you need?"
+        if "price" in lowered or "pricing" in lowered:
+            return "I can help with pricing. Tell me which service or package you want."
+        if "invoice" in lowered:
+            return "I heard your invoice request. Tell me whether you want to cancel it, change the amount, or update the due date."
+        if "meeting" in lowered or "schedule" in lowered:
+            return "I can help with scheduling. Tell me the preferred day and time."
+        if history:
+            return f"You said: {user_text}. I am ready for the next step."
+        return f"I heard: {user_text}. Tell me what you want me to do next."
 
 
-def get_llm_client() -> LLMClient:
-    _ = get_settings()
-    return StubLLMClient()
+class HuggingFaceVoiceLLMClient(VoiceLLMClient):
+    def __init__(self):
+        self.settings = get_settings()
+        self.fallback = StubVoiceLLMClient()
+
+    async def generate_reply(self, history: list[dict[str, str]], user_text: str) -> str:
+        try:
+            return await self._chat(history, user_text)
+        except (httpx.HTTPError, KeyError, ValueError, json.JSONDecodeError):
+            return await self.fallback.generate_reply(history, user_text)
+
+    async def _chat(self, history: list[dict[str, str]], user_text: str) -> str:
+        headers = {
+            "Authorization": f"Bearer {self.settings.llm_api_key}",
+            "Content-Type": "application/json",
+        }
+        messages: list[dict[str, str]] = [{"role": "system", "content": VOICE_AGENT_SYSTEM_PROMPT}]
+        for item in history[-12:]:
+            role = item.get("role", "user")
+            text = item.get("text", "")
+            if role in {"user", "assistant"} and text:
+                messages.append({"role": role, "content": text})
+        messages.append({"role": "user", "content": user_text})
+
+        body = {
+            "model": self.settings.llm_model,
+            "messages": messages,
+            "temperature": 0.4,
+            "max_tokens": 220,
+        }
+        async with httpx.AsyncClient(
+            base_url=self.settings.llm_api_base,
+            timeout=self.settings.llm_timeout_seconds,
+        ) as client:
+            response = await client.post("/chat/completions", headers=headers, json=body)
+            response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        text = self._coerce_message_content(content).strip()
+        if not text:
+            raise ValueError("Empty model response")
+        return text
+
+    @staticmethod
+    def _coerce_message_content(content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    parts.append(str(item.get("text", "")))
+            return "".join(parts)
+        raise ValueError("Unsupported response content")
+
+
+def get_voice_llm_client() -> VoiceLLMClient:
+    provider = get_settings().llm_provider.strip().lower()
+    if provider in {"huggingface", "hf"}:
+        return HuggingFaceVoiceLLMClient()
+    return StubVoiceLLMClient()

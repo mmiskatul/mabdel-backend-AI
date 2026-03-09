@@ -1,12 +1,11 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
+
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.domain.interfaces.queue import JobQueue
-from app.infrastructure.db.repositories import MongoRepository, MongoSessionRepository
-from app.infrastructure.queue.arq_queue import ArqJobQueue
-from app.shared.errors import UnauthorizedError
-from app.shared.security import decode_token, token_fingerprint
+from app.persistence.repositories import MongoRepository, MongoSessionRepository
+from app.shared.errors import ForbiddenError, UnauthorizedError
+from app.shared.security import decode_token
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -19,35 +18,30 @@ def get_session_repo() -> MongoSessionRepository:
     return MongoSessionRepository()
 
 
-def get_queue() -> JobQueue:
-    return ArqJobQueue()
+def validate_access_token(token: str) -> str:
+    payload = decode_token(token)
+    if payload.get("type") != "access":
+        raise UnauthorizedError("Invalid token type")
+    if payload.get("exp", 0) < int(datetime.now(UTC).timestamp()):
+        raise UnauthorizedError("Token expired")
+    return str(payload["sub"])
 
 
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    session_repo: MongoSessionRepository = Depends(get_session_repo),
 ) -> str:
     if credentials is None:
         raise UnauthorizedError("Missing bearer token")
-    payload = decode_token(credentials.credentials)
-    if payload.get("type") != "access":
-        raise UnauthorizedError("Invalid token type")
-    user_id = str(payload["sub"])
-    if payload.get("exp", 0) < int(datetime.now(UTC).timestamp()):
-        raise UnauthorizedError("Token expired")
-    return user_id
+    return validate_access_token(credentials.credentials)
 
 
-async def validate_refresh_token(
-    refresh_token: str,
-    session_repo: MongoSessionRepository,
+async def get_current_admin_user_id(
+    user_id: str = Depends(get_current_user_id),
+    repo: MongoRepository = Depends(get_repo),
 ) -> str:
-    payload = decode_token(refresh_token)
-    if payload.get("type") != "refresh":
-        raise UnauthorizedError("Invalid refresh token type")
-    fp = token_fingerprint(refresh_token)
-    active = await session_repo.is_refresh_token_active(fp)
-    if not active:
-        raise UnauthorizedError("Refresh token revoked or expired")
-    return str(payload["sub"])
-
+    user = await repo.find_one("users", {"_id": repo.object_id(user_id)})
+    if not user:
+        raise UnauthorizedError("User not found")
+    if user.get("role") != "admin":
+        raise ForbiddenError("Admin access required")
+    return user_id

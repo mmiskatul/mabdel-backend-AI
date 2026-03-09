@@ -32,4 +32,3 @@ class EmailService:
             if settings.smtp_username and settings.smtp_password:
                 server.login(settings.smtp_username, settings.smtp_password)
             server.send_message(message)
-
