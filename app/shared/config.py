@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     llm_provider: str = "stub"
     llm_api_key: str = "stub"
     llm_model: str = "stub-model"
+    llm_api_base: str = "https://router.huggingface.co/v1"
+    llm_timeout_seconds: float = 30.0
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_username: str = ""
@@ -27,6 +29,9 @@ class Settings(BaseSettings):
     smtp_from_name: str = "Mabdel backend AI"
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
+    admin_name: str = "SmartFlow Admin"
+    admin_email: str = ""
+    admin_password: str = ""
     signup_code_expire_minutes: int = 10
     signup_token_expire_minutes: int = 10
     otp_code_expire_minutes: int = 10

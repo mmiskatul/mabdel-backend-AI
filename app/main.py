@@ -1,32 +1,21 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.api.routers import (
-    agent,
-    automations,
-    auth,
-    calendar,
-    calls,
-    commands,
-    conversations,
-    dashboard,
-    documents,
-    group,
-    home,
-    integrations,
-    messages,
-    settings,
-    voice,
-    webhooks,
-)
-from app.api.websocket.routes import router as ws_router
-from app.infrastructure.db.indexes import ensure_indexes
-from app.infrastructure.db.mongo import MongoManager
+from app.api.routers import agent, auth, users
+from app.application.services.auth_service import ensure_seed_admin
+from app.persistence.indexes import ensure_indexes
+from app.persistence.mongo import MongoManager
+from app.persistence.repositories import MongoRepository
 from app.shared.config import get_settings
 from app.shared.errors import AppError
 from app.shared.logging import configure_logging
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 @asynccontextmanager
@@ -34,6 +23,7 @@ async def lifespan(_: FastAPI):
     configure_logging()
     db = MongoManager.db()
     await ensure_indexes(db)
+    await ensure_seed_admin(MongoRepository())
     yield
     await MongoManager.close()
 
@@ -41,23 +31,11 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings_obj = get_settings()
     app = FastAPI(title=settings_obj.app_name, lifespan=lifespan)
-    app.include_router(auth.router, prefix="/api/v1")
-    app.include_router(automations.router, prefix="/api/v1")
-    app.include_router(integrations.router, prefix="/api/v1")
-    app.include_router(conversations.router, prefix="/api/v1")
-    app.include_router(webhooks.router, prefix="/api/v1")
-    app.include_router(dashboard.router, prefix="/api/v1")
-    app.include_router(calendar.router, prefix="/api/v1")
-    app.include_router(documents.router, prefix="/api/v1")
-    app.include_router(calls.router, prefix="/api/v1")
-    app.include_router(commands.router, prefix="/api/v1")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.include_router(auth.customer_router, prefix="/api/v1")
+    app.include_router(auth.admin_router, prefix="/api/v1")
     app.include_router(agent.router, prefix="/api/v1")
-    app.include_router(settings.router, prefix="/api/v1")
-    app.include_router(home.router, prefix="/api/v1")
-    app.include_router(messages.router, prefix="/api/v1")
-    app.include_router(voice.router, prefix="/api/v1")
-    app.include_router(group.router, prefix="/api/v1")
-    app.include_router(ws_router)
+    app.include_router(users.router, prefix="/api/v1")
 
     @app.exception_handler(AppError)
     async def app_error_handler(_: Request, exc: AppError):
@@ -67,9 +45,9 @@ def create_app() -> FastAPI:
     async def validation_handler(_: Request, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-    @app.get("/health")
-    async def health():
-        return {"status": "ok"}
+    @app.get("/voice-agent-test", include_in_schema=False)
+    async def voice_agent_test():
+        return FileResponse(STATIC_DIR / "voice-agent-test" / "index.html")
 
     return app
 

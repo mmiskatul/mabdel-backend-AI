@@ -1,32 +1,45 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal, TypedDict
+
 from pydantic import BaseModel, Field
 
 
-class SummaryResponse(BaseModel):
-    summary: str
-    key_points: list[str] = Field(default_factory=list)
-    action_items: list[str] = Field(default_factory=list)
+class AgentMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    text: str
+    created_at: datetime | None = None
 
 
-class DraftReplyResponse(BaseModel):
+class AgentSessionResponse(BaseModel):
+    session_id: str
+    created_at: datetime
+
+
+class AgentReplyResponse(BaseModel):
+    session_id: str
     reply_text: str
-    confidence: float
-    requires_human_review: bool
-    safe_to_auto_send: bool = False
-    reason: str | None = None
-    tags: list[str] = Field(default_factory=list)
+    turns: list[AgentMessage] = Field(default_factory=list)
 
 
-class AutoReplyDecision(BaseModel):
-    should_reply: bool
+class RealtimeUserMessage(BaseModel):
+    type: Literal["user_message"]
+    text: str = Field(min_length=1)
+
+
+class RealtimeAgentEvent(BaseModel):
+    type: Literal["session_ready", "assistant_message", "agent_status", "error"]
+    session_id: str
+    text: str | None = None
+    detail: str | None = None
+    stage: str | None = None
+
+
+class AgentGraphState(TypedDict, total=False):
+    user_id: str
+    session_id: str
+    user_text: str
+    history: list[dict[str, str]]
     reply_text: str
-    reason: str
-    confidence: float
-    safe_to_auto_send: bool
-    requires_human_review: bool = True
-    prompt_injection_detected: bool = False
-    sensitive_topic: bool = False
-
-
-class SmartFlowResponse(BaseModel):
-    answer: str
-    suggested_actions: list[dict] = Field(default_factory=list)
+    persisted_turns: list[dict[str, str]]

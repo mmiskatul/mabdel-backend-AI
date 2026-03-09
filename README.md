@@ -36,6 +36,21 @@ Worker:
 arq app.infrastructure.queue.worker.WorkerSettings
 ```
 
+## LLM provider switch
+The agent layer defaults to a local `stub` provider. You can switch it to Hugging Face Inference Providers without changing the API surface:
+
+```bash
+LLM_PROVIDER=huggingface
+LLM_API_KEY=hf_xxxxxxxxx
+LLM_MODEL=openai/gpt-oss-20b
+LLM_API_BASE=https://router.huggingface.co/v1
+```
+
+Notes:
+- `stub` remains the default for local development and tests.
+- The Hugging Face client calls the OpenAI-compatible `/chat/completions` route and falls back to the local stub if the remote response is invalid.
+- Free-tier models are suitable for development and prototyping, but expect tighter rate limits and less reliable structured output than paid models.
+
 ## Run with Docker
 ```bash
 docker compose up --build

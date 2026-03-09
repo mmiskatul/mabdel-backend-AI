@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Agent Test</title>
+  <link rel="stylesheet" href="/static/voice-agent-test/styles.css">
+</head>
+<body>
+  <main class="chat-app">
+    <aside class="auth-drawer">
+      <div class="brand-block">
+        <p class="eyebrow">SmartFlow</p>
+        <h1>Voice Chat</h1>
+        <p class="hero-text">Login once, connect the socket, then talk naturally. Your speech is transcribed and sent as chat.</p>
+      </div>
+
+      <div class="status-stack">
+        <div class="status-card">
+          <span>Session</span>
+          <strong id="sessionId">not connected</strong>
+        </div>
+        <div class="status-card">
+          <span>Socket</span>
+          <strong id="socketState">closed</strong>
+        </div>
+        <div class="status-card">
+          <span>Stage</span>
+          <strong id="stageText">idle</strong>
+        </div>
+      </div>
+
+      <div class="auth-panel">
+        <label class="field">
+          <span>Auth Type</span>
+          <select id="authType">
+            <option value="admin">Admin</option>
+            <option value="customer">Customer</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Auto Speak Reply</span>
+          <select id="autoSpeak">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Email</span>
+          <input id="email" type="email" placeholder="admin@smartflow.local">
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input id="password" type="password" placeholder="Admin123!">
+        </label>
+
+        <div class="actions">
+          <button id="loginButton" class="primary">Login</button>
+          <button id="connectButton">Connect</button>
+          <button id="disconnectButton">Disconnect</button>
+        </div>
+
+        <label class="field token-field">
+          <span>Access Token</span>
+          <textarea id="token" rows="4" placeholder="Filled after login"></textarea>
+        </label>
+      </div>
+    </aside>
+
+    <section class="chat-shell">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">Realtime Agent</p>
+          <h2>Mabdel AI</h2>
+        </div>
+        <button id="stopSpeakButton" class="ghost" type="button">Stop Voice</button>
+      </header>
+
+      <section id="messages" class="messages"></section>
+
+      <footer class="composer-wrap">
+        <div class="composer-bar">
+          <textarea id="messageInput" rows="1" placeholder="Type a message or use the mic"></textarea>
+          <button id="listenButton" class="mic-button" type="button" title="Start Listening" aria-label="Start Listening">
+            <span class="mic-icon"></span>
+          </button>
+          <button id="sendButton" class="send-button" type="button">Send</button>
+        </div>
+      </footer>
+
+      <details class="debug-panel">
+        <summary>Event Log</summary>
+        <pre id="log" class="log"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="/static/voice-agent-test/app.js"></script>
+</body>
+</html>
