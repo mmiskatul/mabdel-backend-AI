@@ -1,44 +1,91 @@
-from fastapi import APIRouter, Depends
+from __future__ import annotations
 
-from app.api.deps import get_current_user_id
-from app.api.schemas import SmartFlowBody
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
+
+from app.agent.models import RealtimeAgentEvent, RealtimeUserMessage
+from app.api.deps import get_current_user_id, get_repo, validate_access_token
 from app.api.service_factory import get_agent_service
 from app.application.services.agent_service import AgentService
+from app.shared.errors import AppError
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
-@router.post("/conversations/{conversation_id}/summary")
-async def summary(
-    conversation_id: str,
+@router.post("/sessions")
+async def create_session(
     user_id: str = Depends(get_current_user_id),
     service: AgentService = Depends(get_agent_service),
 ):
-    return await service.conversation_summary(user_id, conversation_id)
+    return await service.create_session(user_id)
 
 
-@router.post("/conversations/{conversation_id}/draft_reply")
-async def draft_reply(
-    conversation_id: str,
+@router.get("/sessions/{session_id}/messages")
+async def get_messages(
+    session_id: str,
     user_id: str = Depends(get_current_user_id),
     service: AgentService = Depends(get_agent_service),
 ):
-    return await service.draft_reply(user_id, conversation_id)
+    return await service.get_messages(user_id, session_id)
 
 
-@router.post("/inbound/{message_id}/decide")
-async def decide_inbound(
-    message_id: str,
-    user_id: str = Depends(get_current_user_id),
-    service: AgentService = Depends(get_agent_service),
+@router.websocket("/ws/{session_id}")
+async def agent_realtime_socket(
+    websocket: WebSocket,
+    session_id: str,
+    token: str = Query(...),
 ):
-    return await service.decide_inbound(message_id, user_id=user_id)
+    try:
+        user_id = validate_access_token(token)
+    except AppError:
+        await websocket.close(code=4401)
+        return
 
+    service = AgentService(get_repo())
+    if session_id == "new":
+        created = await service.create_session(user_id)
+        session_id = created.session_id
 
-@router.post("/smartflow/ask")
-async def smartflow_ask(
-    body: SmartFlowBody,
-    user_id: str = Depends(get_current_user_id),
-    service: AgentService = Depends(get_agent_service),
-):
-    return await service.smartflow_ask(user_id, body.text)
+    await websocket.accept()
+    await websocket.send_json(
+        RealtimeAgentEvent(type="session_ready", session_id=session_id, detail="connected").model_dump()
+    )
+
+    try:
+        while True:
+            raw_payload = await websocket.receive_json()
+            try:
+                payload = RealtimeUserMessage.model_validate(raw_payload)
+            except ValidationError as exc:
+                await websocket.send_json(
+                    RealtimeAgentEvent(
+                        type="error",
+                        session_id=session_id,
+                        detail=exc.errors()[0]["msg"],
+                    ).model_dump()
+                )
+                continue
+
+            await websocket.send_json(
+                RealtimeAgentEvent(
+                    type="agent_status",
+                    session_id=session_id,
+                    stage="processing",
+                ).model_dump()
+            )
+            try:
+                reply = await service.respond(user_id, session_id, payload.text)
+            except AppError as exc:
+                await websocket.send_json(
+                    RealtimeAgentEvent(type="error", session_id=session_id, detail=exc.message).model_dump()
+                )
+                continue
+            await websocket.send_json(
+                RealtimeAgentEvent(
+                    type="assistant_message",
+                    session_id=session_id,
+                    text=reply.reply_text,
+                ).model_dump()
+            )
+    except WebSocketDisconnect:
+        return
